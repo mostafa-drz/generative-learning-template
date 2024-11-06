@@ -39,12 +39,12 @@ export async function sendMessageToThread(text:string, threadId:string, assistan
     while(!(await isRunComplete(run))) {
         await new Promise(resolve => setTimeout(resolve, 1000));
     }
-    const messages = await getRunMessages(run);
+    const messages = (await getRunMessages(run)).data;
     return messages;
 }
 
 export async function getThreadMessages(threadId:string) {
-    const messages = await openai.beta.threads.messages.list(threadId);
+    const messages = (await openai.beta.threads.messages.list(threadId)).data;
     return messages;
 }
 
