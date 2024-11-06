@@ -1,8 +1,40 @@
-"use client";
-import { postMessageToThread } from "./actions";
+import Chat from "./components/Chat";
+import NewMessageForm from "./components/NewMessageForm";
+import { cookies } from "next/headers";
+import { getUserByID,setUserThreadId } from "@/utils/firebase";
+import { createThread, getThreadMessages } from "@/utils";
 
-export default function ChatPage() {
+export async function getUserThreadMessages() {
+  const ASSISTANT_ID = process.env.OPEN_AI_ASSISTANT_ID as string;
+  if(!ASSISTANT_ID){
+      throw new Error("Assistant ID not found");
+  }
+  const allCookies = await cookies();
+  const userId = allCookies.get('userId')?.value;
+  console.log("User ID from cookies", userId)
+  if(!userId) {
+      console.error('User id not found on the cookies')
+      throw new Error("Not Authorized");
 
+  }
+  const user = await getUserByID(userId);
+  if(!user) {
+      console.error('User not found on DB')
+      throw new Error("Not Authorized");
+  }
+  let userThreadId = user?.threadID;
+  if(!userThreadId) {
+      console.log("No thread ID found for user, creating a new thread")
+      userThreadId = (await createThread()).id;
+      await setUserThreadId(userId, userThreadId);
+      console.log("Thread created and updated in DB")
+  }
+  const threadMessages = await getThreadMessages(userThreadId);
+  console.log({threadMessages})
+  return threadMessages;
+}
+export default async function ChatPage() {
+  const messages = await getUserThreadMessages();
   return (
     <div className="flex flex-col h-screen bg-gray-100">
       {/* Header */}
@@ -10,43 +42,11 @@ export default function ChatPage() {
         <h1 className="text-xl font-semibold">Chat Education</h1>
       </header>
 
-      {/* Chat Window
-      <div className="flex-grow overflow-y-auto p-4 space-y-4">
-        {messages?.map((msg, index) => (
-          <div
-            key={index}
-            className={`flex ${
-              msg.role === "user" ? "justify-end" : "justify-start"
-            }`}
-          >
-            <div
-              className={`rounded-lg p-3 max-w-xs ${
-                msg.role === "user"
-                  ? "bg-blue-500 text-white self-end"
-                  : "bg-gray-200 text-gray-800 self-start"
-              }`}
-            >
-              {msg.content.toString()}
-            </div>
-          </div>
-        ))}
-      </div> */}
+      {/* Chat Area */}
+      <Chat messages={messages}/>
 
       {/* Input Area */}
-      <form className="p-4 bg-white shadow-md flex text-slate-900" action={postMessageToThread}>
-        <input
-          type="text"
-          className="flex-grow border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
-          placeholder="Type your message..."
-          name="message"
-        />
-        <button
-          type="submit"
-          className="ml-2 bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700 transition"
-        >
-          Send
-        </button>
-      </form>
+      <NewMessageForm />
     </div>
   );
 }
